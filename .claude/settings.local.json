@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x c:/Claude/Transfer/M2M-FM/ears/.git/hooks/pre-commit)"
+    ]
+  }
+}

@@ -44,6 +44,15 @@
       flex-shrink: 0;
     }
 
+    #version {
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      margin-left: 10px;
+      align-self: flex-end;
+      padding-bottom: 2px;
+    }
+
     header h1 {
       font-size: 1.2rem;
       font-weight: 700;
@@ -193,7 +202,7 @@
 <body>
 
   <header>
-    <h1>Ears</h1>
+    <h1>Ears</h1><span id="version">v3</span>
     <div id="status-pill">
       <div id="status-dot"></div>
       <span id="status-text">Stopped</span>
@@ -245,37 +254,44 @@
     recognition.interimResults = true;
     recognition.lang           = 'en-US';
 
-    let finalText       = '';
-    let listening       = false;
-    let committedCount  = 0;   // guards against Chrome re-sending finalized results on restart
+    let committedText = '';   // finals confirmed before current session
+    let sessionText  = '';   // finals accumulated in current session (rebuilt each event)
+    let listening    = false;
 
-    recognition.onstart = () => { committedCount = 0; };
+    function displayText() {
+      const full = committedText + (committedText && sessionText ? ' ' : '') + sessionText;
+      elTranscript.textContent = full;
+      elPlaceholder.style.opacity = full || elInterim.textContent ? '0' : '1';
+      scrollToBottom();
+    }
 
     // ── Results ────────────────────────────────────────────────────────────
     recognition.onresult = event => {
+      // Rebuild sessionText from ALL results in this session (avoids resultIndex bugs).
+      sessionText = '';
       let interim = '';
 
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const chunk = event.results[i][0].transcript;
+      for (let i = 0; i < event.results.length; i++) {
+        const chunk = event.results[i][0].transcript.trim();
         if (event.results[i].isFinal) {
-          if (i >= committedCount) {
-            finalText += (finalText.length > 0 ? ' ' : '') + chunk.trim();
-            committedCount = i + 1;
-          }
+          sessionText += (sessionText ? ' ' : '') + chunk;
         } else {
           interim += chunk;
         }
       }
 
-      elTranscript.textContent = finalText;
-      elInterim.textContent    = interim;
-      elPlaceholder.style.opacity = finalText || interim ? '0' : '1';
-      scrollToBottom();
+      elInterim.textContent = interim;
+      displayText();
     };
 
     // ── Auto-restart on end (browser stops after ~60 s of silence) ─────────
     recognition.onend = () => {
-      if (listening) recognition.start();
+      if (listening) {
+        // Snapshot current session before restarting so it isn't re-processed.
+        committedText += (committedText && sessionText ? ' ' : '') + sessionText;
+        sessionText = '';
+        recognition.start();
+      }
     };
 
     recognition.onerror = event => {
@@ -323,7 +339,8 @@
 
     // ── Clear ───────────────────────────────────────────────────────────────
     elBtnClear.addEventListener('click', () => {
-      finalText = '';
+      committedText = '';
+      sessionText   = '';
       elTranscript.textContent = '';
       elInterim.textContent    = '';
       elPlaceholder.style.opacity = '1';
